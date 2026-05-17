@@ -1,0 +1,50 @@
+{
+  "name": "pi-opencode-session-import",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Import OpenCode sessions into native vanilla-Pi and OMP sessions",
+  "author": "Jordan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jms830/pi-opencode-session-import.git"
+  },
+  "keywords": [
+    "pi",
+    "omp",
+    "opencode",
+    "session",
+    "import",
+    "pi-package",
+    "agent"
+  ],
+  "files": [
+    "src",
+    "adapters",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "bun test src/core.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "pi": {
+    "extensions": [
+      "./adapters/pi/index.ts"
+    ]
+  },
+  "omp": {
+    "extensions": [
+      "./adapters/omp/index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@oh-my-pi/pi-coding-agent": "*",
+    "@types/bun": "latest",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
