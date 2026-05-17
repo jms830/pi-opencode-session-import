@@ -167,3 +167,22 @@ describe("canonical session UUIDs", () => {
 		expect(CANONICAL_NAMESPACE_UUID).toBe("6e7b9c2a-3f4d-5e1f-a8b7-1c2d3e4f5a6b");
 	});
 });
+
+describe("delegated session filtering", () => {
+	test("listOpenCodeSessions excludes delegated subagent sessions by default", () => {
+		const fs = require("node:fs") as typeof import("node:fs");
+		const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
+		// Add a delegated session to fixture DB
+		const sql = `INSERT INTO session (id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, agent, model) VALUES ('ses_subagent', 'proj', 'ses_alpha', 'sub', '/repo/a', 'Audit (@oracle subagent)', '0.13.0', 4000, 9000, 'oracle', 'claude-sonnet-4-6')`;
+		const result = spawnSync("sqlite3", [dbPath, sql], { encoding: "utf8" });
+		if (result.status !== 0) throw new Error(result.stderr);
+
+		// Default: should NOT include delegated
+		const defaultPlan = require("./core").listOpenCodeSessions(dbPath, { limit: 50 });
+		expect(defaultPlan.map((s: { id: string }) => s.id).sort()).toEqual(["ses_alpha", "ses_beta"]);
+
+		// Explicit mainOnly:false should include delegated
+		const withDelegated = require("./core").listOpenCodeSessions(dbPath, { limit: 50, mainOnly: false });
+		expect(withDelegated.map((s: { id: string }) => s.id).sort()).toEqual(["ses_alpha", "ses_beta", "ses_subagent"]);
+	});
+});

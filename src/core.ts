@@ -116,6 +116,8 @@ export interface ListOptions {
 	since?: number;
 	updatedSince?: number;
 	limit?: number;
+	/** When true (default), exclude OpenCode delegated/subagent sessions (parent_id IS NOT NULL). */
+	mainOnly?: boolean;
 }
 
 export interface ImportRegistryEntry {
@@ -246,6 +248,7 @@ export function listOpenCodeSessions(dbPath: string, options: ListOptions = {}):
 	if (options.cwd?.trim()) predicates.push(`directory = ${sqlString(options.cwd.trim())}`);
 	if (options.since !== undefined) predicates.push(`time_created >= ${integerLiteral(options.since)}`);
 	if (options.updatedSince !== undefined) predicates.push(`time_updated >= ${integerLiteral(options.updatedSince)}`);
+	if (options.mainOnly !== false) predicates.push("parent_id IS NULL");
 
 	return runSqliteJson<OpenCodeSessionRow>(
 		dbPath,
