@@ -43,6 +43,7 @@ interface ParsedArgs {
 	updatedSince: number | undefined;
 	dryRun: boolean;
 	force: boolean;
+	includeDelegated: boolean;
 	selectorOrSessionId: string | undefined;
 }
 
@@ -61,6 +62,7 @@ function parseArgs(args: string): ParsedArgs {
 	let updatedSince: number | undefined;
 	let dryRun = false;
 	let force = false;
+	let includeDelegated = false;
 	const positional: string[] = [];
 
 	for (let i = 0; i < tokens.length; i += 1) {
@@ -74,10 +76,11 @@ function parseArgs(args: string): ParsedArgs {
 		else if (token === "--updated-since") updatedSince = parseTime(tokens[++i]);
 		else if (token === "--dry-run") dryRun = true;
 		else if (token === "--force") force = true;
+		else if (token === "--include-delegated") includeDelegated = true;
 		else positional.push(token);
 	}
 
-	return { dbPath, registryPath, limit, maxToolChars, search: undefined, cwd, since, updatedSince, dryRun, force, selectorOrSessionId: positional.join(" ").trim() || undefined };
+	return { dbPath, registryPath, limit, maxToolChars, search: undefined, cwd, since, updatedSince, dryRun, force, includeDelegated, selectorOrSessionId: positional.join(" ").trim() || undefined };
 }
 
 async function importOne(ctx: CommandContext, parsed: ParsedArgs, sessionId: string): Promise<{ imported: boolean; session?: OpenCodeSessionRow; message?: string }> {
@@ -123,7 +126,7 @@ async function importOne(ctx: CommandContext, parsed: ParsedArgs, sessionId: str
 
 async function importAll(ctx: CommandContext, parsed: ParsedArgs): Promise<void> {
 	const registry = loadImportRegistry(parsed.registryPath);
-	const plan = planBulkImport(parsed.dbPath, registry, parsed, RUNTIME);
+	const plan = planBulkImport(parsed.dbPath, registry, { ...parsed, mainOnly: !parsed.includeDelegated }, RUNTIME);
 	if (parsed.dryRun) {
 		ctx.ui.notify(`Dry run: ${plan.toImport.length} to import, ${plan.skippedAlreadyImported.length} already in registry\n${formatSessionList(plan.toImport, registry, RUNTIME)}`, "info");
 		return;
@@ -146,7 +149,7 @@ async function selectAndImport(ctx: CommandContext, parsed: ParsedArgs, search?:
 		return;
 	}
 	const registry = loadImportRegistry(parsed.registryPath);
-	const sessions = listOpenCodeSessions(parsed.dbPath, { search, cwd: parsed.cwd, since: parsed.since, updatedSince: parsed.updatedSince, limit: parsed.limit });
+	const sessions = listOpenCodeSessions(parsed.dbPath, { search, cwd: parsed.cwd, since: parsed.since, updatedSince: parsed.updatedSince, limit: parsed.limit, mainOnly: !parsed.includeDelegated });
 	if (sessions.length === 0) {
 		ctx.ui.notify(search ? `No OpenCode sessions matched: ${search}` : "No OpenCode sessions found", "warning");
 		return;
@@ -168,13 +171,13 @@ async function selectAndImport(ctx: CommandContext, parsed: ParsedArgs, search?:
 
 function handleList(ctx: CommandContext, parsed: ParsedArgs, search?: string): void {
 	const registry = loadImportRegistry(parsed.registryPath);
-	const sessions = listOpenCodeSessions(parsed.dbPath, { search, cwd: parsed.cwd, since: parsed.since, updatedSince: parsed.updatedSince, limit: parsed.limit });
+	const sessions = listOpenCodeSessions(parsed.dbPath, { search, cwd: parsed.cwd, since: parsed.since, updatedSince: parsed.updatedSince, limit: parsed.limit, mainOnly: !parsed.includeDelegated });
 	ctx.ui.notify(formatSessionList(sessions, registry, RUNTIME), "info");
 }
 
 function handleStatus(ctx: CommandContext, parsed: ParsedArgs): void {
 	const registry = loadImportRegistry(parsed.registryPath);
-	ctx.ui.notify(formatImportStatus(planBulkImport(parsed.dbPath, registry, parsed, RUNTIME), registry, RUNTIME), "info");
+	ctx.ui.notify(formatImportStatus(planBulkImport(parsed.dbPath, registry, { ...parsed, mainOnly: !parsed.includeDelegated }, RUNTIME), registry, RUNTIME), "info");
 }
 
 async function handleOpen(ctx: CommandContext, parsed: ParsedArgs, sessionId: string | undefined): Promise<void> {
@@ -206,6 +209,7 @@ export default function opencodeImportExtension(pi: ExtensionAPI): void {
 			{ value: "--cwd ", label: "--cwd <path>" },
 			{ value: "--updated-since ", label: "--updated-since <iso|ms>" },
 			{ value: "--max-tool-chars ", label: "--max-tool-chars <n>" },
+			{ value: "--include-delegated", label: "--include-delegated (subagent sessions)" },
 		],
 		handler: async (args, ctx) => {
 			try {
