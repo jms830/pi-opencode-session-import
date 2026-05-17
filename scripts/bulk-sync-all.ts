@@ -7,8 +7,9 @@
  *     skipped via their embedded source session id
  *
  * Usage:
- *   bun scripts/bulk-sync-all.ts                  # both runtimes, real run
+ *   bun scripts/bulk-sync-all.ts                  # main sessions only, both runtimes
  *   bun scripts/bulk-sync-all.ts --dry-run        # plan only
+ *   bun scripts/bulk-sync-all.ts --include-delegated  # also import @agent subagent sessions
  *   bun scripts/bulk-sync-all.ts --runtimes pi    # only Pi
  *   bun scripts/bulk-sync-all.ts --runtimes omp   # only OMP
  *   bun scripts/bulk-sync-all.ts --db PATH        # alternate OpenCode DB
@@ -41,6 +42,7 @@ interface Args {
 	runtimes: Runtime[];
 	limit: number;
 	maxToolChars: number;
+	includeDelegated: boolean;
 }
 
 function parseArgs(): Args {
@@ -49,6 +51,7 @@ function parseArgs(): Args {
 	let dryRun = false;
 	let limit = 5000;
 	let maxToolChars = 4000;
+	let includeDelegated = false;
 	let runtimes: Runtime[] = ["pi", "omp"];
 	for (let i = 0; i < argv.length; i += 1) {
 		const arg = argv[i];
@@ -56,12 +59,13 @@ function parseArgs(): Args {
 		else if (arg === "--dry-run") dryRun = true;
 		else if (arg === "--limit") limit = Math.max(1, Math.min(20000, Math.trunc(Number(argv[++i]))));
 		else if (arg === "--max-tool-chars") maxToolChars = Math.max(0, Math.trunc(Number(argv[++i])));
+		else if (arg === "--include-delegated") includeDelegated = true;
 		else if (arg === "--runtimes") {
 			runtimes = argv[++i].split(",").map((s) => s.trim()).filter((s): s is Runtime => s === "pi" || s === "omp");
 			if (runtimes.length === 0) throw new Error("--runtimes must include 'pi' and/or 'omp'");
 		}
 	}
-	return { db, dryRun, runtimes, limit, maxToolChars };
+	return { db, dryRun, runtimes, limit, maxToolChars, includeDelegated };
 }
 
 function sessionsRoot(runtime: Runtime, cwd: string): string {
@@ -121,11 +125,13 @@ interface FastSession {
 	time_updated: number;
 }
 
-function loadSessionsFast(db: Database, limit: number): FastSession[] {
+function loadSessionsFast(db: Database, limit: number, includeDelegated: boolean): FastSession[] {
+	const predicates = ["time_archived IS NULL"];
+	if (!includeDelegated) predicates.push("parent_id IS NULL");
 	return db.query(`
 		SELECT id, directory, title, time_updated
 		FROM session
-		WHERE time_archived IS NULL
+		WHERE ${predicates.join(" AND ")}
 		ORDER BY time_updated DESC, id DESC
 		LIMIT ?
 	`).all(limit) as FastSession[];
@@ -170,8 +176,8 @@ async function main(): Promise<void> {
 	console.log(`Dry run:     ${args.dryRun}\n`);
 
 	const db = new Database(args.db, { readonly: true });
-	const sessions = loadSessionsFast(db, args.limit);
-	console.log(`Discovered ${sessions.length} active OpenCode sessions`);
+	const sessions = loadSessionsFast(db, args.limit, args.includeDelegated);
+	console.log(`Discovered ${sessions.length} active OpenCode sessions${args.includeDelegated ? "" : " (main only — pass --include-delegated to include subagents)"}`);
 
 	const preScan: Record<Runtime, Set<string>> = { pi: new Set(), omp: new Set() };
 	for (const runtime of args.runtimes) {
