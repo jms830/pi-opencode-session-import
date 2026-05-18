@@ -100,6 +100,7 @@ async function importOne(ctx: CommandContext, parsed: ParsedArgs, sessionId: str
 		runtime: "pi",
 		cwd: targetCwd,
 		parentSession: ctx.sessionManager.getSessionFile(),
+		timestamp: new Date(loaded.session.time_updated),
 	});
 	mkdirSync(sessionDir, { recursive: true });
 	const filePath = join(sessionDir, fileName);

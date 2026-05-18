@@ -98,6 +98,7 @@ async function importOne(ctx: ExtensionCommandContext, parsed: ParsedArgs, sessi
 		runtime: "omp",
 		cwd: targetCwd,
 		parentSession: ctx.sessionManager.getSessionFile(),
+		timestamp: new Date(loaded.session.time_updated),
 	});
 	mkdirSync(sessionDir, { recursive: true });
 	const filePath = join(sessionDir, fileName);
