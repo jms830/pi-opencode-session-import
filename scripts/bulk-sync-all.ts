@@ -258,7 +258,7 @@ async function main(): Promise<void> {
 		for (const runtime of work) {
 			try {
 				const dir = resolveDir(runtime, session.directory);
-				const { content, fileName } = buildSessionFileContent(converted, { runtime, cwd: session.directory });
+				const { content, fileName } = buildSessionFileContent(converted, { runtime, cwd: session.directory, timestamp: new Date(session.time_updated) });
 				mkdirSync(dir, { recursive: true });
 				writeFileSync(join(dir, fileName), content);
 				preScan[runtime].add(session.id);
